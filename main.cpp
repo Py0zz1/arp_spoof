@@ -156,7 +156,7 @@ void pkt_relay(const u_int8_t *pkt_data,bpf_u_int32 caplen)
     eh = (struct eth_header *)pkt_data;
     ih = (struct ip_header *)(pkt_data+sizeof(struct eth_header));
 
-        // IP try-catch
+        // IP
         if(!(memcmp(eh->src_mac,sender_mac,sizeof(eh->src_mac))) && !(ih->ip_des_add.s_addr==my_ip.sin_addr.s_addr) )
         {
             cout << "Sender PKT IN ::"<<endl;
